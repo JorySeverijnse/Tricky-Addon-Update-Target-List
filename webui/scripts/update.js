@@ -40,13 +40,17 @@ function downloadFile(targetURL, fileName) {
 
 // Function to check for updates
 export async function updateCheck() {
+    console.log("updateCheck() called");
     try {
+        console.log("updateCheck: Attempting to fetch from GitHub...");
         const link = "https://raw.githubusercontent.com/KOWX712/Tricky-Addon-Update-Target-List/main/update.json";
         let response = await fetch(link).catch(() => null);
         if (!response || !response.ok) {
+            console.log("updateCheck: Primary fetch failed, trying CDN...");
             response = await fetch(`https://gh.sevencdn.com/${link}`);
         }
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        console.log("updateCheck: Fetch successful, status:", response.status);
         connection = true;
         const data = await response.json();
         remoteVersionCode = data.versionCode;
@@ -54,16 +58,37 @@ export async function updateCheck() {
         zipURL = data.zipUrl;
         changelogURL = data.changelog;
 
+        console.log("updateCheck: Running get_extra.sh --check-update...");
         const output = spawn('sh', [`${basePath}/common/get_extra.sh`, '--check-update', `${remoteVersionCode}`]);
         output.stdout.on('data', (data) => {
             if (data.includes("update")) {
+                console.log("updateCheck: Update available");
                 updateCard.style.display = "flex";
                 setupUpdateMenu();
             }
         });
+        output.on('exit', (code) => {
+            console.log("updateCheck: get_extra.sh exited with code:", code);
+        });
     } catch (error) {
-        console.error("Error fetching JSON or executing command:", error);
-        showPrompt(getString("prompt_no_internet"), false);
+        console.error("Error in updateCheck():", error);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        
+        if (error.message.includes('fetch') || error.message.includes('network') || 
+            error.message.includes('Network') || error.message.includes('Failed to fetch')) {
+            console.error("Detected network error in updateCheck()");
+            showPrompt(getString("prompt_no_internet"), false);
+        } else if (error.message.includes('permission') || error.message.includes('Permission') ||
+                   error.message.includes('ashmem') || error.message.includes('/proc/')) {
+            console.error("Detected permission error in updateCheck():", error.message);
+            showPrompt("Permission error: " + error.message, false);
+        } else {
+            console.error("Unknown error type in updateCheck():", error.message);
+            showPrompt("Error checking updates: " + error.message, false);
+        }
+        
         connection = false;
     }
 }

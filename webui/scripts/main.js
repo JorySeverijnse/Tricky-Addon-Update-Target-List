@@ -46,6 +46,7 @@ function getModuleVersion() {
 
 // Function to refresh app list
 export async function refreshAppList() {
+    console.log("refreshAppList called, connection state:", connection);
     isRefreshing = true;
     floatingBtn.classList.add('hide');
     searchInput.value = '';
@@ -54,6 +55,7 @@ export async function refreshAppList() {
     document.querySelector('.uninstall-container').style.display = 'none';
     window.scrollTo(0, 0);
     if (connection === false) {
+        console.log("Connection is false, calling updateCheck()");
         updateCheck();
         exec(`rm -f "${basePath}/common/tmp/exclude-list"`);
     }
@@ -421,6 +423,49 @@ document.querySelectorAll('md-dialog').forEach(dialog => {
         return customAnim;
     };
 });
+
+window.debugTestOperations = async () => {
+    console.log("=== DEBUG TEST OPERATIONS ===");
+    
+    console.log("Test 1: Testing fetch() to GitHub...");
+    try {
+        const response = await fetch("https://raw.githubusercontent.com/KOWX712/Tricky-Addon-Update-Target-List/main/update.json").catch(() => null);
+        console.log("Fetch test result:", response ? `OK (status: ${response.status})` : "Failed");
+    } catch (error) {
+        console.error("Fetch test error:", error);
+    }
+    
+    console.log("Test 2: Testing exec() with simple command...");
+    try {
+        const { errno, stderr } = await exec("echo 'test'");
+        console.log("Exec test result:", errno === 0 ? "OK" : `Failed (errno: ${errno}, stderr: ${stderr})`);
+    } catch (error) {
+        console.error("Exec test error:", error);
+    }
+    
+    console.log("Test 3: Testing exec() with heredoc...");
+    try {
+        const { errno, stderr } = await exec(`cat << 'TEST_EOF'
+test data
+TEST_EOF`);
+        console.log("Exec heredoc test result:", errno === 0 ? "OK" : `Failed (errno: ${errno}, stderr: ${stderr})`);
+    } catch (error) {
+        console.error("Exec heredoc test error:", error);
+    }
+    
+    console.log("Test 4: Testing WebCrypto availability...");
+    try {
+        if (window.crypto && window.crypto.subtle) {
+            console.log("WebCrypto is available");
+        } else {
+            console.log("WebCrypto is NOT available");
+        }
+    } catch (error) {
+        console.error("WebCrypto test error:", error);
+    }
+    
+    console.log("=== DEBUG TEST COMPLETE ===");
+};
 
 // Initial load
 document.addEventListener('DOMContentLoaded', async () => {

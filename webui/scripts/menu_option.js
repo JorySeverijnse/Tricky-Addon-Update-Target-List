@@ -169,14 +169,26 @@ document.querySelectorAll('.sub-menu-entry').forEach(entry => {
  * @returns {Promise<Boolean>}
  */
 export async function setKeybox(content) {
-    const { errno } = await exec(`
-        mv -f /data/adb/tricky_store/keybox.xml /data/adb/tricky_store/keybox.xml.bak 2>/dev/null
-        cat << 'KB_EOF' > /data/adb/tricky_store/keybox.xml
+    try {
+        const { errno, stderr } = await exec(`
+            mv -f /data/adb/tricky_store/keybox.xml /data/adb/tricky_store/keybox.xml.bak 2>/dev/null
+            cat << 'KB_EOF' > /data/adb/tricky_store/keybox.xml
 ${content}
 KB_EOF
-        chmod 644 /data/adb/tricky_store/keybox.xml
-    `);
-    return errno === 0;
+            chmod 644 /data/adb/tricky_store/keybox.xml
+        `);
+        if (errno !== 0) {
+            console.error("setKeybox exec failed with errno:", errno);
+            console.error("stderr:", stderr);
+        }
+        return errno === 0;
+    } catch (error) {
+        console.error("setKeybox caught error:", error);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        throw error;
+    }
 }
 
 /**
@@ -184,35 +196,87 @@ KB_EOF
  * @returns {Promise<void>}
  */
 async function aospkb() {
-    const { stdout } = await exec(`xxd -r -p ${basePath}/common/.default | base64 -d`);
+    console.log("aospkb function called");
+    const { stdout, errno, stderr } = await exec(`xxd -r -p ${basePath}/common/.default | base64 -d`);
+    if (errno !== 0) {
+        console.error("aospkb exec failed with errno:", errno);
+        console.error("stderr:", stderr);
+        throw new Error(`Exec failed with errno ${errno}: ${stderr}`);
+    }
+    console.log("AOSP keybox decoded, length:", stdout.length);
     const result = await setKeybox(stdout);
+    console.log("aospkb setKeybox result:", result);
     showPrompt(getString(result ? "prompt_aosp_key_set" : "prompt_key_set_error"), result);
+    return result;
 }
 
 // aosp kb eventlistener
-document.getElementById("aospkb").onclick = aospkb;
+document.getElementById("aospkb").onclick = async () => {
+    try {
+        console.log("aospkb clicked");
+        await aospkb();
+    } catch (error) {
+        console.error("aospkb error:", error);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        
+        if (error.message.includes('permission') || error.message.includes('Permission') ||
+            error.message.includes('ashmem') || error.message.includes('/proc/')) {
+            console.error("Detected permission error in aospkb:", error.message);
+            showPrompt("Permission error setting AOSP keybox: " + error.message, false);
+        }
+    }
+};
 
 // unkown kb eventlistener
 document.getElementById("devicekb").onclick = async () => {
     try {
+        console.log("devicekb clicked, generating unknown keybox...");
         const keyboxContent = await generateUnknownKeybox();
+        console.log("Keybox generated, length:", keyboxContent.length);
         const result = await setKeybox(keyboxContent);
+        console.log("setKeybox result:", result);
         showPrompt(getString(result ? "prompt_unknown_key_set" : "prompt_key_set_error"), result);
     } catch (error) {
-        console.error(error);
-        showPrompt(getString("prompt_key_set_error"), false);
+        console.error("devicekb error:", error);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        
+        if (error.message.includes('permission') || error.message.includes('Permission') ||
+            error.message.includes('ashmem') || error.message.includes('/proc/')) {
+            console.error("Detected permission error in devicekb:", error.message);
+            showPrompt("Permission error setting keybox: " + error.message, false);
+        } else {
+            showPrompt(getString("prompt_key_set_error"), false);
+        }
     }
 }
 
 // Open local keybox selector
 document.getElementById('localkb').onclick = async () => {
     try {
+        console.log("localkb clicked");
         const content = await FileSelector.getFileContent('xml');
         if (!content) return;
+        console.log("Local keybox content loaded, length:", content.length);
         const result = await setKeybox(content);
+        console.log("localkb setKeybox result:", result);
         showPrompt(getString(result ? "prompt_custom_key_set" : "prompt_key_set_error"), result);
     } catch (error) {
-        showPrompt(getString("prompt_key_set_error"), false);
+        console.error("localkb error:", error);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        
+        if (error.message.includes('permission') || error.message.includes('Permission') ||
+            error.message.includes('ashmem') || error.message.includes('/proc/')) {
+            console.error("Detected permission error in localkb:", error.message);
+            showPrompt("Permission error setting local keybox: " + error.message, false);
+        } else {
+            showPrompt(getString("prompt_key_set_error"), false);
+        }
     }
 }
 

@@ -94,7 +94,17 @@ CUSTOMKB_EOF`,
         showPrompt(getString(result ? "prompt_custom_key_set" : "prompt_key_set_error"), result);
     } catch (error) {
         console.error("Custom keybox fetch error:", error);
-        showPrompt(getString("prompt_custom_fetch_error"), false);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+        
+        if (error.message.includes('permission') || error.message.includes('Permission') ||
+            error.message.includes('ashmem') || error.message.includes('/proc/')) {
+            console.error("Detected permission error in fetchCustomKeybox():", error.message);
+            showPrompt("Permission error in keybox fetch: " + error.message, false);
+        } else {
+            showPrompt(getString("prompt_custom_fetch_error"), false);
+        }
     }
 }
 
